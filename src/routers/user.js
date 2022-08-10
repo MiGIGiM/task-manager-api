@@ -1,6 +1,7 @@
-const express = require('express')
 require('../db/mongoose')
+const express = require('express')
 const User = require('../models/user')
+const auth = require('../middlewares/auth')
 
 const router = new express.Router()
 
@@ -9,21 +10,53 @@ router.post('/users', async (req, res) => {
 
   try {
     await user.save()
-    res.status(201).send(user)
+
+    const token = await user.generateAuthToken()
+
+    res.status(201).send({ token, user })
   } catch (e) {
     res.status(400).send({ error: e.message })
   }
 
 })
 
-router.get('/users', async (req, res) => {
+router.post('/users/login', async (req, res) => {
   try {
-    const users = await User.find({})
+    const user = await User.findByCredentials(req.body.email, req.body.password)
+    const token = await user.generateAuthToken()
 
-    res.status(200).send({ data: users })
+    res.send({ token, user })
   } catch (e) {
     res.status(400).send({ error: e.message })
   }
+})
+
+router.post('/users/logout', auth, async (req, res) => {
+  try {
+    req.user.tokens = req.user.tokens.filter((token) => token.token !== req.token)
+
+    await req.user.save()
+
+    res.send('Logged out')
+  } catch (e) {
+    req.status(400).send({ error: e.message })
+  }
+})
+
+router.post('/users/logoutAll', auth, async (req, res) => {
+  try {
+    req.user.tokens = []
+
+    await req.user.save()
+
+    res.send('All sessions closed')
+  } catch (e) {
+    res.status(400).send({ e: e.message })
+  }
+})
+
+router.get('/users/me', auth, async (req, res) => {
+  res.send(req.user)
 })
 
 router.get('/users/:id', async (req, res) => {

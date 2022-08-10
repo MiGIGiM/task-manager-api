@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 const validator = require('validator')
 const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -20,6 +21,7 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
+    unique: true,
     trim: true,
     lowercase: true,
     validate(value) {
@@ -35,8 +37,38 @@ const userSchema = new mongoose.Schema({
     validate(value) {
       if (value.toLowerCase().includes('password')) throw new Error('Password cannot contain "password".')
     }
-  }
+  },
+  tokens: [{
+    token: {
+      type: String,
+      require: true
+    }
+  }]
 })
+
+userSchema.statics.findByCredentials = async (email, password) => {
+  const user = await User.findOne({ email })
+
+  if (!User) throw new Error('Unable to login')
+
+  const isMatch = await bcrypt.compare(password, user.password)
+
+  if (!isMatch) throw new Error('Unable to login')
+
+  return user
+}
+
+userSchema.methods.generateAuthToken = async function () {
+  const user = this
+
+  const token = jwt.sign({ _id: user.id.toString() }, 'DOMExKANO')
+
+  user.tokens = user.tokens.concat({ token })
+
+  await user.save()
+
+  return token;
+}
 
 userSchema.pre('save', async function(next) {
   const user = this
