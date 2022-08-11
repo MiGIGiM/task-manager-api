@@ -17,9 +17,35 @@ router.post('/tasks', auth, async (req, res) => {
   }
 })
 
+/**
+ * * To sort by any property just need to specify it inside the sort option.
+ * * Whether it's ascending or descending can be determined by setting the value to
+ * ? 1 or -1 respectively 
+ * */
 router.get('/tasks', auth, async (req, res) => {
+  const match = {}
+  const sort = {}
+
+  if (req.query.completed) {
+    match.completed = req.query.completed
+  }
+
+  if (req.query.sortBy) {
+    const parts = req.query.sortBy.split(':')
+
+    sort[parts[0]] = parts[1]
+  }
+
   try {
-    await req.user.populate('tasks').execPopulate()
+    await req.user.populate({
+      path: 'tasks',
+      match,
+      options: {
+        limit: parseInt(req.query.limit),
+        skip: parseInt(req.query.skip),
+        sort
+      }
+    }).execPopulate()
 
     res.status(200).send({ data: req.user.tasks })
   } catch (e) {
